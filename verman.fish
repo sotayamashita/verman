@@ -25,7 +25,7 @@ function verman -a cmd
     or return
 
     set -l flag -g
-    set -l cmds "node" "python"
+    set -l cmds "node" "python" "ruby"
     set -e fish_user_paths
 
     if test ! -z "$cmd"
@@ -85,6 +85,37 @@ function _verman_help
     end | fish_indent --ansi | command sed 's/^/  /'
     echo $c
     echo "Learn more: <github.com/fisherman/verman>"
+end
+
+function _verman_ruby -a ver target
+    set -l mirror "https://cache.ruby-lang.org/pub/ruby/"
+    if test ! -z "$verman_ruby_mirror"
+        set mirror "$verman_ruby_mirror"
+    end
+
+    string split "." $ver | read -l 1 2
+    set -l ver_base "$1.$2"
+    set -l file "ruby-$ver.tar.gz"
+    set -l url "$mirror/$ver_base/$file"
+
+    echo "Downloading <$url>" > /dev/stderr
+    command mkdir -p "$target" "$target-build"
+    pushd "$target-build"
+
+    if not command curl --fail --progress-bar -SLO "$url"
+        command rm -rf "$target-build" "$target"
+        popd
+        echo "verman: download error: $url" > /dev/stderr
+        return 1
+    end
+
+    command tar -zx --strip-components=1 < "$file"
+    command rm -f "$file"
+    popd
+
+    if test ! -d "$target"
+        return 1
+    end
 end
 
 function _verman_node -a ver target
