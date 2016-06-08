@@ -63,47 +63,46 @@ function verman -a cmd
 
         set bin "$verman_config/$i/$ver/bin"
         if test ! -d "$bin"
-            eval "_verman_$i" $ver "$verman_config/node/$ver"
+            eval "_verman_$i" $ver "$verman_config/$i/$ver"
             or continue
         end
 
         if test -d "$bin"
-            contains -- "$bin" $fish_user_paths
-            or set -U fish_user_paths "$bin" $fish_user_paths
+            if not contains -- "$bin" $fish_user_paths
+                set -U fish_user_paths "$bin" $fish_user_paths
+            end
         end
     end
 end
 
 function _verman_help
     set -l c (set_color normal)
-    echo "Verman is a multi-command version manager."
-    echo
     echo "Usage:"
     begin
-        echo "echo VERSION > .command-version"
+        echo "echo VERSION > .COMMAND-version"
         echo "verman"
     end | fish_indent --ansi | command sed 's/^/  /'
     echo $c
-    echo "Learn more: <github.com/fisherman/verman>"
+    echo "where COMMAND can be one of: "
+    echo "  node, ruby, python or go"
+    echo
+    echo "Docs: <github.com/fisherman/verman>"
 end
 
-function _verman_ruby -a ver target
-    set -l mirror "https://cache.ruby-lang.org/pub/ruby/"
-    if test ! -z "$verman_ruby_mirror"
-        set mirror "$verman_ruby_mirror"
+function _verman_tar_get -a cmd mirror file target
+    set -l _mirror "verman_$cmd_mirror"
+    if test ! -z "$$_mirror"
+        set mirror "$$_mirror"
     end
 
-    string split "." $ver | read -l 1 2
-    set -l ver_base "$1.$2"
-    set -l file "ruby-$ver.tar.gz"
-    set -l url "$mirror/$ver_base/$file"
-
-    echo "Downloading <$url>" > /dev/stderr
-    command mkdir -p "$target" "$target-build"
-    pushd "$target-build"
+    set -l url "$mirror/$file"
+    set file (string split / $file)[-1]
+    echo "$url" > /dev/stderr
+    command mkdir -p "$target"
+    pushd "$target"
 
     if not command curl --fail --progress-bar -SLO "$url"
-        command rm -rf "$target-build" "$target"
+        command rm -rf "$target"
         popd
         echo "verman: download error: $url" > /dev/stderr
         return 1
@@ -112,21 +111,32 @@ function _verman_ruby -a ver target
     command tar -zx --strip-components=1 < "$file"
     command rm -f "$file"
     popd
+end
 
-    if test ! -d "$target"
-        return 1
+function _verman_make -a source target
+    pushd "$source"
+    ./configure --prefix="$target"
+    command make
+    command make install
+    popd
+    command rm -rf "$source"
+end
+
+function _verman_python -a ver target
+    _verman_tar_get "python" "https://www.python.org/ftp/python" "$ver/Python-$ver.tar.xz" "$target-build"
+    _verman_make "$target-build" "$target"
+    if test -L "$target/bin/python3"
+        command ln -s "$target/bin/python3" "$target/bin/python"
     end
 end
 
+function _verman_ruby -a ver target
+    _verman_tar_get "ruby" "https://cache.ruby-lang.org/pub/ruby" "ruby-$ver.tar.gz" "$target-build"
+    _verman_make "$target-build" "$target"
+end
+
 function _verman_node -a ver target
-    set -l mirror "http://nodejs.org/dist"
-    if test ! -z "$verman_node_mirror"
-        set mirror "$verman_node_mirror"
-    end
-
     set -l os (uname -s)
-    set -l file
-
     switch "$os"
         case Linux
             set -l arch (uname -m)
@@ -141,24 +151,5 @@ function _verman_node -a ver target
         case \*
             return 2
     end
-
-    set -l url "$mirror/v$ver/$file"
-    echo "Downloading <$url>" > /dev/stderr
-    command mkdir -p "$target"
-    pushd "$target"
-
-    if not command curl --fail --progress-bar -SLO "$url"
-        command rm -rf "$target"
-        popd
-        echo "verman: download error: $url" > /dev/stderr
-        return 1
-    end
-
-    command tar -zx --strip-components=1 < "$file"
-    command rm -f "$file"
-    popd
-
-    if test ! -d "$target"
-        return 1
-    end
+    _verman_tar_get "node" "http://nodejs.org/dist" "v$ver/$file" "$target"
 end

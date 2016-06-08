@@ -48,10 +48,11 @@ v6.2.0
 ## Supported languages
 
 * [x] Node.js
-* [ ] Python
-* [ ] Ruby
+* [x] Python
+* [x] Ruby
 * [ ] Golang
 * [ ] Haskell
+* [ ] Elixir
 
 ## Automatic version switching
 
