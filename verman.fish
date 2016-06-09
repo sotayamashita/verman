@@ -1,4 +1,4 @@
-set -g verman_version 1.0
+set -g verman_version 1.1
 complete -xc verman -n __fish_use_subcommand -a version -d "Show version info"
 complete -xc verman -n __fish_use_subcommand -a help  -d "Show usage help"
 
