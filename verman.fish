@@ -25,7 +25,7 @@ function verman -a cmd
     or return
 
     set -l flag -g
-    set -l cmds "node" "python" "ruby"
+    set -l cmds "node" "go" "ruby"
     set -e fish_user_paths
 
     if test ! -z "$cmd"
@@ -63,8 +63,7 @@ function verman -a cmd
 
         set bin "$verman_config/$i/$ver/bin"
         if test ! -d "$bin"
-            eval "_verman_$i" $ver "$verman_config/$i/$ver"
-            or continue
+            eval "_verman_$i" "$ver" "$verman_config/$i/$ver"
         end
 
         if test -d "$bin"
@@ -79,14 +78,14 @@ function _verman_help
     set -l c (set_color normal)
     echo "Usage:"
     begin
-        echo "echo VERSION > .COMMAND-version"
+        echo "echo x.x.x > .command-version"
         echo "verman"
     end | fish_indent --ansi | command sed 's/^/  /'
     echo $c
-    echo "where COMMAND can be one of: "
-    echo "  node, ruby, python or go"
-    echo
-    echo "Docs: <github.com/fisherman/verman>"
+    echo "Supported commands:"
+    echo "    node"
+    echo "    go"
+    echo "    ruby"
 end
 
 function _verman_tar_get -a cmd mirror file target
@@ -113,43 +112,46 @@ function _verman_tar_get -a cmd mirror file target
     popd
 end
 
-function _verman_make -a source target
-    pushd "$source"
-    ./configure --prefix="$target"
-    command make
-    command make install
-    popd
-    command rm -rf "$source"
-end
-
-function _verman_python -a ver target
-    _verman_tar_get "python" "https://www.python.org/ftp/python" "$ver/Python-$ver.tar.xz" "$target-build"
-    _verman_make "$target-build" "$target"
-    if test -L "$target/bin/python3"
-        command ln -s "$target/bin/python3" "$target/bin/python"
-    end
-end
-
-function _verman_ruby -a ver target
-    _verman_tar_get "ruby" "https://cache.ruby-lang.org/pub/ruby" "ruby-$ver.tar.gz" "$target-build"
-    _verman_make "$target-build" "$target"
-end
-
-function _verman_node -a ver target
-    set -l os (uname -s)
-    switch "$os"
+function _verman_node -a ver target file
+    switch (uname -s)
         case Linux
             set -l arch (uname -m)
-            if test "$arch" = "x86_64"
-                set arch 64
-            else
-                set arch 86
-            end
+            test "$arch" = "x86_64"
+            and set arch 64
+            or set arch 86
             set file "node-v$ver-linux-x$arch.tar.gz"
         case Darwin
             set file "node-v$ver-darwin-x64.tar.gz"
         case \*
             return 2
     end
-    _verman_tar_get "node" "http://nodejs.org/dist" "v$ver/$file" "$target"
+    _verman_tar_get "node" "https://nodejs.org/dist" "v$ver/$file" "$target"
+end
+
+function _verman_go -a ver target file
+    switch (uname -s)
+        case Linux
+            set -l arch (uname -m)
+            test "$arch" = "x86_64"
+            and set arch "amd64"
+            or set arch "386"
+            set file "go$ver.linux-$arch.tar.gz"
+        case Darwin
+            set file "go$ver.darwin-amd64.tar.gz"
+        case \*
+            return 2
+    end
+    _verman_tar_get "go" "https://golang.org/dl" "$file" "$target"
+    set -Ux GOROOT "$target"
+end
+
+function _verman_ruby -a ver target file
+    switch (uname -s)
+        case Darwin
+            sw_vers -productVersion | string split "." | read -lz 1 2 _
+            set file "osx/$1.$2/x86_64/ruby-$ver.tar.bz2"
+        case \*
+            return 2
+    end
+    _verman_tar_get "ruby" "https://rvm.io/binaries" "$file" "$target"
 end
